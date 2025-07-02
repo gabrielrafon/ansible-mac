@@ -1,26 +1,21 @@
 ---
-username: scirons
+username: gmarafon
 
 configure_brew: true
 configure_dotfiles: true
 configure_finder: true
 configure_dock: true
 configure_keys: true
-configure_ui: true
+configure_ui: false
 
-wallpaper_file: side.png
 
 dotfiles_repo: https://github.com/scirons/dotfiles.git
 dotfiles_dir: ~/.dotfiles
 
-custom_taps:
-  - name: "{{ username }}/creative-suite"
-    url: https://github.com/scirons/homebrew-creative-suite.git
 
 taps:
   - nikitabobko/tap
   - FelixKratz/formulae
-  - scirons/creative-suite
 
 packages:
   - tmux
@@ -40,7 +35,6 @@ packages:
   - git
   - git-lfs
   - secretive
-  - restic
   - rclone
   - nmap
   - mpv
@@ -49,34 +43,16 @@ packages:
   - qemu
   - iperf3
   - speedtest-cli
-  - brave-browser
   - ffmpeg
-  - syncthing
   - gnupg
   - gpg-suite
   - newsboat
   - obsidian
-  - notion
-  - notion-calendar
-  - slack
-  - thunderbird
-  - onlyoffice
   - visual-studio-code
-  - hugo
-  - blender
   - figma
   - pandoc
-  - bisq
-  - trezor-suite
-  - trezor-bridge
-  - ibkr
-  - yt-dlp
   - translate-shell
-  - telegram
   - imagemagick
-  - winbox
-  - qbittorrent
-  - tradingview
   - fzf
   - arp-scan
   - wireshark
@@ -84,8 +60,3 @@ packages:
 tap_packages:
   - sketchybar
   - aerospace
-  - scirons/creative-suite/fontlab
-  - scirons/creative-suite/glyphs
-  - scirons/creative-suite/illustrator
-  - scirons/creative-suite/photoshop
-  - scirons/creative-suite/resolve

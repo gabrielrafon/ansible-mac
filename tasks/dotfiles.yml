@@ -15,7 +15,7 @@
   ansible.builtin.git:
     repo: "{{ dotfiles_repo }}"
     dest: "~/.dotfiles"
-    version: master
+    version: visa
     force: true
 
 - name: Stow zsh to home directory
