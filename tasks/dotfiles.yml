@@ -1,53 +1,96 @@
 ---
-- name: Ensure stow is installed
-  homebrew:
-    name: stow
-    state: present
-    update_homebrew: true
+- name: Check whether the dotfiles checkout exists
+  ansible.builtin.stat:
+    path: "{{ dotfiles_dir }}"
+  register: dotfiles_checkout
 
-- name: Ensure .config directory exists
-  file:
-    path: "{{ ansible_env.HOME }}/.config"
-    state: directory
-    mode: '0755'
+- name: Inspect existing dotfiles checkout without changing it
+  ansible.builtin.command:
+    argv: [git, -C, "{{ dotfiles_dir }}", status, --porcelain, --untracked-files=all]
+  register: dotfiles_status
+  changed_when: false
+  check_mode: false
+  when: dotfiles_checkout.stat.exists
 
-- name: Clone dotfiles repository locally
+- name: Protect local dotfile edits
+  ansible.builtin.assert:
+    that: dotfiles_status.stdout | default('') | length == 0
+    fail_msg: >-
+      The dotfiles checkout contains local changes. Commit or back them up before
+      applying the pinned revision. Nothing will be adopted or forcibly reset.
+      {{ dotfiles_status.stdout | default('') }}
+
+- name: Check out the pinned dotfiles revision
   ansible.builtin.git:
     repo: "{{ dotfiles_repo }}"
-    dest: "~/.dotfiles"
-    version: master
-    force: true
+    dest: "{{ dotfiles_dir }}"
+    version: "{{ dotfiles_revision }}"
+    force: false
+    recursive: false
+  register: dotfiles_git
 
-- name: Stow zsh to home directory
-  command: /opt/homebrew/bin/stow --adopt --verbose --dir={{ ansible_env.HOME }}/.dotfiles --target={{ ansible_env.HOME }} zsh
-  args:
-    chdir: "{{ ansible_env.HOME }}"
+- name: Explain first-run check-mode limitation
+  ansible.builtin.debug:
+    msg: Dotfiles are not cloned in check mode. Link validation requires an existing checkout and Stow.
+  when: ansible_check_mode and not dotfiles_checkout.stat.exists
 
-- name: Stow aerospace to home directory
-  command: /opt/homebrew/bin/stow --adopt --verbose --dir={{ ansible_env.HOME }}/.dotfiles --target={{ ansible_env.HOME }} aerospace
-  args:
-    chdir: "{{ ansible_env.HOME }}"
+- name: Deploy explicit dotfile mappings
+  when: not ansible_check_mode or dotfiles_checkout.stat.exists
+  block:
+    - name: Ensure each dotfile target directory exists
+      ansible.builtin.file:
+        path: "{{ item.target }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ dotfiles_packages }}"
+      loop_control:
+        label: "{{ item.name }} -> {{ item.target }}"
 
-- name: Find directories in dotfiles repo
-  find:
-    paths: "{{ ansible_env.HOME }}/.dotfiles"
-    file_type: directory
-    recurse: no
-    excludes: [".git"]
-  register: dotfiles_dirs
+    - name: Inspect dotfile target directories
+      ansible.builtin.stat:
+        path: "{{ item.target }}"
+      loop: "{{ dotfiles_packages }}"
+      register: dotfiles_targets
 
-- name: Create parent directories for stow targets
-  file:
-    path: "{{ ansible_env.HOME }}/.config/{{ item.path | basename }}"
-    state: directory
-    mode: '0755'
-  loop: "{{ dotfiles_dirs.files }}"
+    - name: Preview all Stow operations and reject conflicts before linking
+      ansible.builtin.command:
+        argv:
+          - "{{ stow_executable }}"
+          - --simulate
+          - --verbose=1
+          - --no-folding
+          - "--dir={{ dotfiles_dir }}"
+          - "--target={{ item.item.target }}"
+          - "{{ item.item.name }}"
+      loop: "{{ dotfiles_targets.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.stat.exists
+      register: stow_preview
+      changed_when: false
+      check_mode: false
 
-- name: Stow dotfiles to specific .config subdirectories
-  command: >
-    /opt/homebrew/bin/stow --verbose
-    --dir={{ ansible_env.HOME }}/.dotfiles
-    --target={{ ansible_env.HOME }}/.config/{{ item.path | basename }}
-    --no-folding
-    -S {{ item.path | basename }}
-  loop: "{{ dotfiles_dirs.files }}"
+    - name: Report pending dotfile links
+      ansible.builtin.debug:
+        msg: "{{ item.stderr_lines | default([]) }}"
+      loop: "{{ stow_preview.results }}"
+      loop_control:
+        label: "{{ item.item.item.name }}"
+      when: item.stderr | default('') is search('(?m)^(LINK|UNLINK|MKDIR|RMDIR):')
+
+    - name: Apply only pending dotfile links
+      ansible.builtin.command:
+        argv:
+          - "{{ stow_executable }}"
+          - --verbose=1
+          - --no-folding
+          - "--dir={{ dotfiles_dir }}"
+          - "--target={{ item.item.item.target }}"
+          - "{{ item.item.item.name }}"
+      loop: "{{ stow_preview.results }}"
+      loop_control:
+        label: "{{ item.item.item.name }}"
+      when:
+        - not ansible_check_mode
+        - item.stderr | default('') is search('(?m)^(LINK|UNLINK|MKDIR|RMDIR):')
+      changed_when: true

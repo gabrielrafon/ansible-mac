@@ -1,28 +1,48 @@
 ---
-- name: Check if wallpaper exists
-  stat:
-    path: "{{ ansible_env.HOME }}/.config/wallpapers/{{ wallpaper_file }}"
-  register: wallpaper_sourced
+- name: Require the target desktop session for appearance changes
+  ansible.builtin.assert:
+    that: console_user.stdout == target_user
+    fail_msg: Log into the target desktop or disable configure_ui.
 
-- name: Set desktop wallpaper
-  command: osascript -e 'tell application "System Events" to set picture of desktop 1 to "{{ wallpaper_sourced.stat.path }}"'
-  when: wallpaper_sourced.stat.exists
+- name: Inspect requested wallpaper
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.config/wallpapers/{{ wallpaper_file }}"
+  register: wallpaper_source
+
+- name: Report missing wallpaper
+  ansible.builtin.debug:
+    msg: "MANUAL ACTION REQUIRED — wallpaper not found: {{ target_home }}/.config/wallpapers/{{ wallpaper_file }}"
+  when: not wallpaper_source.stat.exists
+
+- name: Read current wallpaper on desktop one
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/osascript
+      - -e
+      - tell application "System Events" to get picture of desktop 1
+  register: wallpaper_current
+  changed_when: false
+  check_mode: false
+  when: wallpaper_source.stat.exists
+
+- name: Apply wallpaper only when different
+  vars:
+    wallpaper_path: "{{ wallpaper_source.stat.lnk_source | default(wallpaper_source.stat.path | default('')) }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/osascript
+      - -e
+      - >-
+        tell application "System Events" to set picture of desktop 1 to
+        {{ wallpaper_path | to_json }}
+  when:
+    - wallpaper_source.stat.exists
+    - wallpaper_current.stdout | default('') != wallpaper_path
   changed_when: true
 
-
-- name: Enable Dark Mode using defaults
-  osx_defaults:
-    domain: Apple Global Domain
+- name: Enable Dark Mode
+  community.general.osx_defaults:
+    domain: NSGlobalDomain
     key: AppleInterfaceStyle
     value: Dark
     type: string
-
-- name: Check if AeroSpace.app exists
-  ansible.builtin.stat:
-    path: "/Applications/AeroSpace.app"
-  register: aerospace_check
-
-- name: Start AeroSpace.app
-  ansible.builtin.command: open -a AeroSpace
-  when: aerospace_check.stat.exists
-  changed_when: false

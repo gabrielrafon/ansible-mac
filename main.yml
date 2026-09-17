@@ -1,42 +1,115 @@
 ---
 - name: Configure macOS
-  hosts: test
-
+  hosts: local
+  become: false
+  environment:
+    PATH: /opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin
+    HOMEBREW_NO_AUTO_UPDATE: '1'
+    HOMEBREW_NO_INSTALL_UPGRADE: '1'
   pre_tasks:
-    - name: "Verifying Playbook requirements"
-      tags: ["always"]
-      block:
-        - name: Check target is running macOS.
-          assert:
-            that: "ansible_distribution == 'MacOSX'"
-            msg: "The target system is not running macOS"
+    - name: Load optional controller-local overrides
+      ansible.builtin.include_vars: "{{ local_config }}"
+      vars:
+        local_config: "{{ lookup('ansible.builtin.first_found', {'files': ['local.yml'], 'paths': [playbook_dir]}, errors='ignore') | default('', true) }}"
+      when: local_config | length > 0
+      tags: [always]
 
-        - name: Check macOS version.
-          assert:
-            that: "ansible_distribution_version is version_compare('12', '>=')"
-            msg: "The target system must be running macOS 12 (Monterey) or higher to use this version of macOS-ansible."
+    - name: Validate supported platform and account
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'MacOSX'
+          - ansible_facts.architecture == 'arm64'
+          - ansible_facts.distribution_version is version(minimum_macos_version, '>=')
+          - ansible_facts.user_uid | int != 0
+          - target_user == ansible_facts.user_id
+          - target_home == ansible_facts.env.HOME
+          - dotfiles_revision is match('^[0-9a-f]{40}$')
+        fail_msg: >-
+          Run as the account being configured on native Apple Silicon, macOS {{ minimum_macos_version }}+.
+          Do not use sudo or Rosetta. dotfiles_revision must be a full commit SHA.
+      tags: [always]
+
+    - name: Verify Command Line Tools
+      ansible.builtin.command: /usr/bin/xcode-select -p
+      changed_when: false
+      check_mode: false
+      tags: [always]
+
+    - name: Inspect Homebrew prerequisite
+      ansible.builtin.stat:
+        path: /opt/homebrew/bin/brew
+      register: brew_prerequisite
+      tags: [always]
+
+    - name: Require bootstrap before configuration
+      ansible.builtin.assert:
+        that: brew_prerequisite.stat.exists
+        fail_msg: Run bash scripts/bootstrap.sh first; check mode does not install prerequisites.
+      tags: [always]
+
+    - name: Identify the logged-in desktop account
+      ansible.builtin.command: /usr/bin/stat -f %Su /dev/console
+      register: console_user
+      changed_when: false
+      check_mode: false
+      tags: [always]
 
   tasks:
-    - import_tasks: tasks/brew.yml
-      when: configure_brew
-      tags: ["brew"]
+    - name: Configure Homebrew packages
+      ansible.builtin.import_tasks: tasks/brew.yml
+      when: configure_brew | bool
+      tags: [brew]
 
-    - import_tasks: tasks/dotfiles.yml
-      when: configure_dotfiles
-      tags: ["dotfiles"]
+    - name: Configure dotfiles
+      ansible.builtin.import_tasks: tasks/dotfiles.yml
+      when: configure_dotfiles | bool
+      tags: [dotfiles]
 
-    - import_tasks: tasks/finder.yml
-      when: configure_finder
-      tags: ["finder"]
+    - name: Configure Finder
+      ansible.builtin.import_tasks: tasks/finder.yml
+      when: configure_finder | bool
+      tags: [finder]
+      notify: Restart Finder
 
-    - import_tasks: tasks/dock.yml
-      when: configure_dock
-      tags: ["dock"]
+    - name: Configure Dock
+      ansible.builtin.import_tasks: tasks/dock.yml
+      when: configure_dock | bool
+      tags: [dock]
+      notify: Restart Dock
 
-    - import_tasks: tasks/keys.yml
-      when: configure_keys
-      tags: ["keys"]
+    - name: Configure keyboard and mouse
+      ansible.builtin.import_tasks: tasks/keys.yml
+      when: configure_keys | bool
+      tags: [keys]
 
-    - import_tasks: tasks/ui.yml
-      when: configure_ui
-      tags: ["ui"]
+    - name: Configure desktop appearance
+      ansible.builtin.import_tasks: tasks/ui.yml
+      when: configure_ui | bool
+      tags: [ui]
+
+    - name: Configure desktop services
+      ansible.builtin.import_tasks: tasks/services.yml
+      when: configure_services | bool
+      tags: [services]
+
+    - name: Show remaining onboarding steps
+      ansible.builtin.debug:
+        msg: See docs/onboarding.md for manual apps, permissions, sign-ins, credentials and data restoration.
+      tags: [always]
+
+  handlers:
+    - name: Restart Finder
+      ansible.builtin.command:
+        argv: [/usr/bin/killall, -u, "{{ target_user }}", Finder]
+      register: finder_restart
+      changed_when: finder_restart.rc == 0
+      failed_when: finder_restart.rc not in [0, 1]
+      when: console_user.stdout == target_user
+
+    - name: Restart Dock
+      ansible.builtin.command:
+        argv: [/usr/bin/killall, -u, "{{ target_user }}", Dock]
+      register: dock_restart
+      changed_when: dock_restart.rc == 0
+      failed_when: dock_restart.rc not in [0, 1]
+      when: console_user.stdout == target_user

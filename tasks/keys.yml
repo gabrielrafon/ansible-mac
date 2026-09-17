@@ -1,27 +1,27 @@
 ---
 - name: Set initial key repeat rate
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "NSGlobalDomain"
     key: "InitialKeyRepeat"
     type: int
     value: 30
 
 - name: Set key repeat rate
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "NSGlobalDomain"
     key: "KeyRepeat"
     type: int
     value: 1
 
 - name: Set Mouse Tracking Speed
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "NSGlobalDomain"
     key: "com.apple.mouse.scaling"
     type: string
     value: "2.0"
 
 - name: Set Scrolling Direction
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "NSGlobalDomain"
     key: "com.apple.swipescrolldirection"
     type: bool

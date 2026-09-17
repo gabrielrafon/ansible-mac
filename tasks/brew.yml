@@ -1,69 +1,65 @@
 ---
-- name: Add user to admin group
-  ansible.builtin.user:
-    name: "{{ username }}"
+- name: Refresh Homebrew metadata for an explicit update
+  ansible.builtin.command: /opt/homebrew/bin/brew update
+  changed_when: true
+  when: update_packages | bool
+
+- name: Ensure declared Homebrew taps exist
+  community.general.homebrew_tap:
+    name: "{{ homebrew_taps }}"
     state: present
-    groups: admin
-    append: true
-  become: true
 
-- name: Enable passwordless sudo for "{{ username }}"
-  ansible.builtin.lineinfile:
-    dest: /etc/sudoers
-    regexp: "^%wheel"
-    line: "{{ username }} ALL=(ALL) NOPASSWD: ALL"
-    validate: "/usr/sbin/visudo -cf %s"
-    state: present
-  become: true
-
-- name: Ensure Homebrew is installed
-  ansible.builtin.stat:
-    path: /opt/homebrew/bin/brew
-  register: brew_check
-
-- name: Install Homebrew
-  shell: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < /dev/null
-  when: not brew_check.stat.exists
-  changed_when: not brew_check.stat.exists
-  # https://stackoverflow.com/questions/25128546/how-to-automate-homebrew-installation
-
-- name: Check if Homebrew shellenv exists in .zprofile
-  ansible.builtin.command: grep -c "brew shellenv" "/Users/{{ username }}/.zprofile"
-  register: shellenv_check
+- name: Validate declared packages before installing them
+  ansible.builtin.script:
+    cmd: >-
+      scripts/validate_packages.py
+      {{ {'formulae': homebrew_formulae, 'casks': homebrew_casks} | to_json | quote }}
+    executable: "{{ ansible_facts.python.executable }}"
+  register: package_validation
   changed_when: false
-  failed_when: false
+  check_mode: false
 
-- name: Add Homebrew to PATH in .zprofile
-  ansible.builtin.lineinfile:
-    path: "/Users/{{ username }}/.zprofile"
-    line: 'eval "$(/opt/homebrew/bin/brew shellenv)"'
-    create: true
-  when: shellenv_check.rc != 0 or shellenv_check.stdout == "0"
+- name: Report package validation
+  ansible.builtin.debug:
+    msg: "{{ package_validation.stdout_lines }}"
 
-- name: Update homebrew
-  homebrew:
-    update_homebrew: yes
-    upgrade_all: yes
-  when: brew_check.stat.exists
+- name: Ensure declared formulae are installed
+  community.general.homebrew:
+    name: "{{ homebrew_formulae }}"
+    state: "{{ 'latest' if update_packages | bool else 'present' }}"
+    force_formula: true
+  when: homebrew_formulae | length > 0
 
-- name: Add Homebrew taps
-  homebrew_tap:
-    name: "{{ item }}"
-    state: present
-  loop: "{{ taps }}"
+- name: Read installed cask identifiers
+  ansible.builtin.command: /opt/homebrew/bin/brew list --cask
+  register: installed_casks
+  changed_when: false
+  check_mode: false
 
-- name: Install Homebrew packages
-  homebrew:
-    name: "{{ item }}"
-    state: latest
-  loop: "{{ packages }}"
-  register: install_result
-  failed_when: install_result.failed and ('Error' in install_result.msg or 'error' in install_result.msg)
+- name: Request an optional password for cask installers
+  ansible.builtin.pause:
+    prompt: "Admin password for cask installers (Enter to skip; never saved in this repo)"
+    echo: false
+  register: cask_sudo_prompt
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - homebrew_sudo_password is not defined
+    - homebrew_casks | length > 0
+    - >-
+      update_packages | bool or
+      (homebrew_casks | map('regex_replace', '^.*/', '') | difference(installed_casks.stdout_lines) | length > 0)
 
-- name: Install packages from taps
-  homebrew:
-    name: "{{ item }}"
-    state: present
-  loop: "{{ tap_packages }}"
-  register: tap_result
-  ignore_errors: true
+- name: Ensure declared casks are installed
+  community.general.homebrew_cask:
+    name: "{{ homebrew_casks }}"
+    state: "{{ 'latest' if update_packages | bool else 'present' }}"
+    sudo_password: "{{ homebrew_sudo_password | default(cask_sudo_prompt.user_input | default(omit)) }}"
+  when: homebrew_casks | length > 0
+
+- name: Report applications requiring manual resolution
+  ansible.builtin.debug:
+    msg: "MANUAL ACTION REQUIRED — {{ item.name }}: {{ item.reason }}"
+  loop: "{{ manual_applications }}"
+  loop_control:
+    label: "{{ item.name }}"

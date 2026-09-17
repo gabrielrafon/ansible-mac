@@ -1,0 +1,9 @@
+---
+# Copy to local.yml; it is ignored by Git. Lists replace the complete default list.
+# Account identity is discovered from the account running the playbook.
+# For a headless VM:
+# configure_ui: false
+# configure_services: false
+# Pin a reviewed dotfiles commit here if testing a revision before committing it.
+# dotfiles_revision: FULL_40_CHARACTER_COMMIT_SHA
+update_packages: false

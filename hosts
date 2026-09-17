@@ -1,5 +1,2 @@
 [local]
-localhost ansible_connection=local
-
-[test]
-vm-test ansible_host=192.168.64.5 ansible_user=scirons ansible_connection=ssh
+localhost ansible_connection=local ansible_python_interpreter="{{ ansible_playbook_python }}"

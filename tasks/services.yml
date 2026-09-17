@@ -1,0 +1,126 @@
+---
+- name: Require the target desktop session for services
+  ansible.builtin.assert:
+    that: console_user.stdout == target_user
+    fail_msg: Log into the target desktop or disable configure_services.
+
+- name: Inspect pinned AeroSpace source
+  ansible.builtin.stat:
+    path: "{{ dotfiles_dir }}/aerospace/aerospace.toml"
+  register: aerospace_source_path
+
+- name: Require dotfiles before configuring services
+  ansible.builtin.assert:
+    that: aerospace_source_path.stat.exists
+    fail_msg: Apply the dotfiles tasks first, or disable configure_services.
+  when: not ansible_check_mode
+
+- name: Configure AeroSpace from its pinned source
+  when: aerospace_source_path.stat.exists
+  block:
+    - name: Read pinned AeroSpace source
+      ansible.builtin.slurp:
+        src: "{{ dotfiles_dir }}/aerospace/aerospace.toml"
+      register: aerospace_source
+
+    - name: Inspect existing AeroSpace target
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.config/aerospace/aerospace.toml"
+        follow: false
+      register: aerospace_target
+
+    - name: Inspect competing AeroSpace home configuration
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.aerospace.toml"
+        follow: false
+      register: aerospace_home_config
+
+    - name: Reject conflicting AeroSpace configurations
+      ansible.builtin.assert:
+        that:
+          - not aerospace_home_config.stat.exists
+          - not (aerospace_target.stat.islnk | default(false))
+        fail_msg: Back up and move existing AeroSpace configurations as described in docs/onboarding.md.
+
+    - name: Read existing AeroSpace configuration
+      ansible.builtin.slurp:
+        src: "{{ target_home }}/.config/aerospace/aerospace.toml"
+      register: aerospace_existing
+      when: aerospace_target.stat.exists
+
+    - name: Protect unmanaged AeroSpace configuration
+      ansible.builtin.assert:
+        that: >-
+          not aerospace_target.stat.exists or
+          (aerospace_existing.content | default('') | b64decode).startswith('# Managed by ansible-mac')
+        fail_msg: Existing AeroSpace config is unmanaged; back it up and move it before applying.
+
+    - name: Ensure AeroSpace configuration directory exists
+      ansible.builtin.file:
+        path: "{{ target_home }}/.config/aerospace"
+        state: directory
+        mode: '0755'
+
+    - name: Render AeroSpace login startup with SketchyBar owned by Homebrew services
+      ansible.builtin.template:
+        src: aerospace.toml.j2
+        dest: "{{ target_home }}/.config/aerospace/aerospace.toml"
+        mode: '0644'
+        backup: true
+        validate: >-
+          {{ ansible_facts.python.executable | quote }} -c
+          'import sys,tomllib; tomllib.load(open(sys.argv[1], "rb"))' %s
+      register: aerospace_config
+
+- name: Inspect SketchyBar configuration
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.config/sketchybar/sketchybarrc"
+  register: sketchybar_config
+
+- name: Require SketchyBar configuration before startup
+  ansible.builtin.assert:
+    that: sketchybar_config.stat.exists
+    fail_msg: Apply dotfiles before services, or disable configure_services.
+  when: not ansible_check_mode
+
+- name: Ensure SketchyBar starts at login and is running
+  community.general.homebrew_services:
+    name: sketchybar
+    state: present
+  when: sketchybar_config.stat.exists
+
+- name: Inspect the AeroSpace application
+  ansible.builtin.stat:
+    path: /Applications/AeroSpace.app
+  register: aerospace_app
+
+- name: Require AeroSpace before startup
+  ansible.builtin.assert:
+    that: aerospace_app.stat.exists
+    fail_msg: Install the declared AeroSpace cask before applying services.
+  when: not ansible_check_mode
+
+- name: Check whether AeroSpace is running for the target user
+  ansible.builtin.command:
+    argv: [/usr/bin/pgrep, -u, "{{ target_user }}", -x, AeroSpace]
+  register: aerospace_process
+  changed_when: false
+  failed_when: aerospace_process.rc not in [0, 1]
+  check_mode: false
+
+- name: Start AeroSpace when not running
+  ansible.builtin.command: /usr/bin/open -a AeroSpace
+  when:
+    - aerospace_app.stat.exists
+    - aerospace_source_path.stat.exists
+    - aerospace_process.rc == 1
+  changed_when: true
+
+- name: Reload a changed AeroSpace configuration
+  ansible.builtin.command: /opt/homebrew/bin/aerospace reload-config
+  when:
+    - aerospace_app.stat.exists
+    - aerospace_process.rc == 0
+    - aerospace_config is defined
+    - aerospace_config is changed
+  changed_when: true

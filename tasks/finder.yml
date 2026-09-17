@@ -1,55 +1,55 @@
 ---
 - name: "Show filename extensions by default"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "NSGlobalDomain"
     key: "AppleShowAllExtensions"
     type: bool
     value: true
 
 - name: "Disable creation of .DS_Store files on network volumes"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.desktopservices"
     key: "DSDontWriteNetworkStores"
     type: bool
     value: true
 
 - name: "Hide external hard drives on desktop"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "ShowExternalHardDrivesOnDesktop"
     type: bool
     value: false
 
 - name: "Hide hard drives on desktop"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "ShowHardDrivesOnDesktop"
     type: bool
     value: false
 
 - name: "Hide removable media on desktop"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "ShowRemovableMediaOnDesktop"
     type: bool
     value: false
 
 - name: "Hide mounted servers on desktop"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "ShowMountedServersOnDesktop"
     type: bool
     value: false
 
 - name: "Hide icons on desktop"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "CreateDesktop"
     type: bool
     value: false
 
 - name: Set menu bar to auto-hide
-  osx_defaults:
+  community.general.osx_defaults:
     domain: NSGlobalDomain
     key: _HIHideMenuBar
     type: bool
@@ -57,50 +57,50 @@
     state: present
 
 - name: "Enable status bar in Finder"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "ShowStatusBar"
     type: bool
     value: true
 
 - name: "Enable breadcrumbs"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "ShowPathbar"
     type: bool
     value: true
 
 - name: "Disable Trash empty warning"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "WarnOnEmptyTrash"
     type: bool
     value: false
 
 - name: "Disable file extension change warning"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "FXEnableExtensionChangeWarning"
     type: bool
     value: false
 
 - name: "Set default view to list"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "FXPreferredViewStyle"
     type: string
     value: "Nlsv"
 
 - name: "Set default new window target"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "NewWindowTarget"
     type: string
     value: "PfLo"
 
 - name: "Set default location to ~/Downloads"
-  osx_defaults:
+  community.general.osx_defaults:
     domain: "com.apple.finder"
     key: "NewWindowTargetPath"
     type: string
-    value: "file://{{ ansible_env.HOME }}/Downloads/"
+    value: "file://{{ target_home }}/Downloads/"

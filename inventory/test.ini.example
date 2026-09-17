@@ -1,0 +1,4 @@
+[local]
+# Bootstrap the VM's Command Line Tools, Homebrew and Python first.
+# Copy to inventory/test.ini and supply the VM's real address and account.
+vm-test ansible_host=192.168.64.5 ansible_user=YOUR_VM_USER ansible_python_interpreter=/opt/homebrew/bin/python3.13

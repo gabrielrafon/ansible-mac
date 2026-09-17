@@ -1,5 +1,7 @@
 ---
-username: scirons
+target_user: "{{ ansible_facts.user_id }}"
+target_home: "{{ ansible_facts.env.HOME }}"
+minimum_macos_version: '14'
 
 configure_brew: true
 configure_dotfiles: true
@@ -7,85 +9,106 @@ configure_finder: true
 configure_dock: true
 configure_keys: true
 configure_ui: true
+configure_services: true
+update_packages: false
 
 wallpaper_file: side.png
+dotfiles_repo: https://github.com/gabrielrafon/dotfiles.git
+dotfiles_revision: 9ba95dd4d13b0420c50bf897ed1d886c87503379
+dotfiles_dir: "{{ target_home }}/.dotfiles"
+stow_executable: /opt/homebrew/bin/stow
+# Explicit mappings match the pinned repository layout. AeroSpace is rendered
+# separately so its startup hook does not compete with the SketchyBar service.
+dotfiles_packages:
+  - {name: zsh, target: "{{ target_home }}"}
+  - {name: tmux, target: "{{ target_home }}"}
+  - {name: kitty, target: "{{ target_home }}/.config/kitty"}
+  - {name: mpv, target: "{{ target_home }}/.config/mpv"}
+  - {name: neofetch, target: "{{ target_home }}/.config/neofetch"}
+  - {name: newsboat, target: "{{ target_home }}/.config/newsboat"}
+  - {name: nvim, target: "{{ target_home }}/.config/nvim"}
+  - {name: sketchybar, target: "{{ target_home }}/.config/sketchybar"}
+  - {name: wallpapers, target: "{{ target_home }}/.config/wallpapers"}
+  - {name: yazi, target: "{{ target_home }}/.config/yazi"}
+  - {name: zathura, target: "{{ target_home }}/.config/zathura"}
+# The old Blender 3.5 preferences and bundled font remain in the checkout.
+# Current Blender versions and Homebrew fonts are not overwritten with them.
 
-dotfiles_repo: https://github.com/scirons/dotfiles.git
-dotfiles_dir: ~/.dotfiles
-
-custom_taps:
-  - name: "{{ username }}/creative-suite"
-    url: https://github.com/scirons/homebrew-creative-suite.git
-
-taps:
+homebrew_taps:
   - nikitabobko/tap
   - FelixKratz/formulae
-  - scirons/creative-suite
-
-packages:
+  - hashicorp/tap
+# The creative-suite tap was unused; add it only with an explicit package choice.
+homebrew_formulae:
   - tmux
   - neovim
-  - kitty
-  - htop
+  - btop
   - yazi
   - pure
-  - font-terminess-ttf-nerd-font
   - zsh-autosuggestions
   - zsh-syntax-highlighting
-  - font-sketchybar-app-font
-  - font-sf-pro
-  - sf-symbols
-  - font-symbols-only-nerd-font
-  - neofetch
   - git
-  - git-lfs
-  - secretive
   - restic
   - rclone
   - nmap
   - mpv
-  - ansible
-  - terraform
-  - qemu
+  - ansible  # User-facing CLI; this repo runs its own pinned Ansible environment.
+  - hashicorp/tap/terraform
   - iperf3
   - speedtest-cli
-  - brave-browser
   - ffmpeg
-  - syncthing
   - gnupg
-  - gpg-suite
   - newsboat
-  - obsidian
-  - notion
-  - notion-calendar
-  - slack
-  - thunderbird
-  - onlyoffice
-  - visual-studio-code
-  - hugo
-  - blender
-  - figma
   - pandoc
-  - bisq
-  - trezor-suite
-  - trezor-bridge
-  - ibkr
   - yt-dlp
-  - translate-shell
-  - telegram
   - imagemagick
-  - winbox
-  - qbittorrent
-  - tradingview
   - fzf
   - arp-scan
   - wireshark
+  - stow
+  - FelixKratz/formulae/sketchybar
 
-tap_packages:
-  - sketchybar
-  - aerospace
-  - scirons/creative-suite/fontlab
-  - scirons/creative-suite/glyphs
-  - scirons/creative-suite/illustrator
-  - scirons/creative-suite/photoshop
-  - scirons/creative-suite/resolve
+homebrew_casks:
+  - kitty
+  - font-terminess-ttf-nerd-font
+  - font-sketchybar-app-font
+  - font-sf-pro
+  - font-symbols-only-nerd-font
+  - sf-symbols
+  - secretive
+  - gpg-suite
+  - thunderbird
+  - visual-studio-code
+  - blender
+  - figma
+  - trezor-suite
+  - trezor-bridge-app  # Formerly trezor-bridge.
+  - telegram
+  - tradingview
+  # Business: preserve the user's selections, using current cask identifiers.
+  - notion-calendar
+  - winbox
+  - tailscale-app  # Formerly tailscale.
+  - onlyoffice
+  - todoist-app  # Formerly todoist.
+  - codex
+  - claude
+  - claude-code
+  - wispr-flow  # Corrected whisprflow.
+  - slack
+  - voicenotes
+  - obsidian
+  - notion
+  - nikitabobko/tap/aerospace
+
+# Retained requests that cannot currently be installed from these Homebrew sources.
+# Explicitly reported on every full apply; no replacement or security bypass.
+manual_applications:
+  - name: neofetch
+    reason: Removed from Homebrew core; choose a maintained source or an explicit replacement.
+  - name: obsidian-cli
+    reason: No formula with this identifier in Homebrew core; confirm the intended CLI and source.
+  - name: bisq
+    reason: Homebrew cask is disabled for failing Gatekeeper checks; review the upstream distribution.
+  - name: qbittorrent
+    reason: Homebrew cask is disabled for failing Gatekeeper checks; review the upstream distribution.
