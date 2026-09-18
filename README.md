@@ -61,7 +61,8 @@ Unlisted applications are never automatically uninstalled.
 - Homebrew owns packages; Stow owns the listed dotfile links.
 - AeroSpace is the exception: Ansible renders its pinned config under
   `~/.config/aerospace/aerospace.toml`, enabling login startup and removing its
-  duplicate SketchyBar startup command. Homebrew services owns SketchyBar.
+  duplicate SketchyBar startup command, and pointing the terminal shortcut at Ghostty.
+  Homebrew services owns SketchyBar.
 - Dotfile conflicts and dirty checkouts fail rather than overwrite local files.
   Edit and commit changes in the dotfiles repository, then update the full
   `dotfiles_revision` SHA here deliberately. Removed Stow mappings are not

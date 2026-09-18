@@ -69,7 +69,7 @@ homebrew_formulae:
   - FelixKratz/formulae/sketchybar
 
 homebrew_casks:
-  - kitty
+  - ghostty
   - font-terminess-ttf-nerd-font
   - font-sketchybar-app-font
   - font-sf-pro
@@ -94,7 +94,8 @@ homebrew_casks:
   - codex
   - claude
   - claude-code
-  - wispr-flow  # Corrected whisprflow.
+  - wispr-flow
+  - bitwarden
   - slack
   - voicenotes
   - obsidian

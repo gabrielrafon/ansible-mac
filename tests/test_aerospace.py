@@ -17,6 +17,7 @@ after-startup-command = ['exec-and-forget sketchybar']
 exec-on-workspace-change = ['/bin/bash', '-c', 'sketchybar --trigger changed']
 [mode.main.binding]
 alt-enter = 'exec-and-forget open -n -a Kitty'
+alt-h = 'focus left'
 '''
         environment = Environment(
             loader=FileSystemLoader(ROOT / "templates"), undefined=StrictUndefined
@@ -31,6 +32,7 @@ alt-enter = 'exec-and-forget open -n -a Kitty'
         self.assertTrue(parsed["start-at-login"])
         self.assertEqual([], parsed["after-startup-command"])
         self.assertEqual(
-            "exec-and-forget open -n -a Kitty", parsed["mode"]["main"]["binding"]["alt-enter"]
+            "exec-and-forget open -n -a Ghostty", parsed["mode"]["main"]["binding"]["alt-enter"]
         )
+        self.assertEqual("focus left", parsed["mode"]["main"]["binding"]["alt-h"])
         self.assertEqual("sketchybar --trigger changed", parsed["exec-on-workspace-change"][-1])

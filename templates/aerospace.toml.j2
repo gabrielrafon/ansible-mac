@@ -1,4 +1,5 @@
 # Managed by ansible-mac; edit the pinned source or this template, not this file.
 {{ aerospace_source.content | b64decode
    | regex_replace('(?m)^start-at-login\\s*=.*$', 'start-at-login = true')
-   | regex_replace('(?m)^after-startup-command\\s*=.*$', 'after-startup-command = []') }}
+   | regex_replace('(?m)^after-startup-command\\s*=.*$', 'after-startup-command = []')
+   | replace('exec-and-forget open -n -a Kitty', 'exec-and-forget open -n -a Ghostty') }}
